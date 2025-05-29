@@ -1,1300 +1,1323 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, useReducer } from 'react';
-import { Play, Pause, Square, Download, Upload, Trash2, Edit2, Save, X, Clock, BarChart3, Settings } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
-// Action types for reducer
-const ActionTypes = {
-  START_TIMER: 'START_TIMER',
-  STOP_TIMER: 'STOP_TIMER',
-  UPDATE_TIMER: 'UPDATE_TIMER',
-  START_POMODORO: 'START_POMODORO',
-  PAUSE_POMODORO: 'PAUSE_POMODORO',
-  RESET_POMODORO: 'RESET_POMODORO',
-  UPDATE_POMODORO: 'UPDATE_POMODORO',
-  ADD_ENTRY: 'ADD_ENTRY',
-  DELETE_ENTRY: 'DELETE_ENTRY',
-  UPDATE_ENTRY: 'UPDATE_ENTRY',
-  SET_CATEGORIES: 'SET_CATEGORIES',
-  ADD_CATEGORY: 'ADD_CATEGORY',
-  ADD_PROJECT: 'ADD_PROJECT',
-  UPDATE_CATEGORY_COLOR: 'UPDATE_CATEGORY_COLOR',
-  SET_ACTIVE_TAB: 'SET_ACTIVE_TAB',
-  SET_DATE_FILTER: 'SET_DATE_FILTER',
-  SET_CUSTOM_DATE_RANGE: 'SET_CUSTOM_DATE_RANGE',
-  SET_EDITING_ENTRY: 'SET_EDITING_ENTRY',
-  SET_SELECTED_CATEGORY: 'SET_SELECTED_CATEGORY',
-  SET_SELECTED_PROJECT: 'SET_SELECTED_PROJECT',
-  IMPORT_DATA: 'IMPORT_DATA'
-};
-
-// Initial state
-const initialState = {
-  // Timer state
-  timerState: {
-    isRunning: false,
-    startTime: null,
-    elapsed: 0,
-    category: 'Work',
-    project: 'undefined'
-  },
-  // Pomodoro state
-  pomodoroState: {
-    isRunning: false,
-    isPaused: false,
-    remaining: 25 * 60,
-    category: 'Work',
-    project: 'undefined'
-  },
-  // UI state
-  uiState: {
-    activeTab: 'timer',
-    editingEntry: null,
-    dateFilter: 'daily',
-    customDateRange: { start: '', end: '' },
-    selectedCategory: 'Work',
-    selectedProject: 'undefined'
-  },
-  // Data state
-  dataState: {
-    categories: {
-      'Work': { color: '#0078D7', projects: ['undefined', 'Project A', 'Project B'] },
-      'Personal': { color: '#5CB85C', projects: ['undefined', 'Exercise', 'Reading'] }
-    },
-    entries: []
-  }
-};
-
-// Reducer function
-function appReducer(state, action) {
-  switch (action.type) {
-    case ActionTypes.START_TIMER:
-      return {
-        ...state,
-        timerState: {
-          ...state.timerState,
-          isRunning: true,
-          startTime: Date.now(),
-          elapsed: 0,
-          category: state.uiState.selectedCategory,
-          project: state.uiState.selectedProject
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows XP Time Tracker</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.5.0/dist/Recharts.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
         }
-      };
-    
-    case ActionTypes.STOP_TIMER:
-      return {
-        ...state,
-        timerState: {
-          ...state.timerState,
-          isRunning: false,
-          startTime: null,
-          elapsed: 0
-        }
-      };
-    
-    case ActionTypes.UPDATE_TIMER:
-      return {
-        ...state,
-        timerState: {
-          ...state.timerState,
-          elapsed: action.payload
-        }
-      };
-    
-    case ActionTypes.START_POMODORO:
-      return {
-        ...state,
-        pomodoroState: {
-          ...state.pomodoroState,
-          isRunning: true,
-          isPaused: false,
-          category: state.uiState.selectedCategory,
-          project: state.uiState.selectedProject
-        }
-      };
-    
-    case ActionTypes.PAUSE_POMODORO:
-      return {
-        ...state,
-        pomodoroState: {
-          ...state.pomodoroState,
-          isRunning: false,
-          isPaused: true
-        }
-      };
-    
-    case ActionTypes.RESET_POMODORO:
-      return {
-        ...state,
-        pomodoroState: {
-          ...state.pomodoroState,
-          isRunning: false,
-          isPaused: false,
-          remaining: 25 * 60
-        }
-      };
-    
-    case ActionTypes.UPDATE_POMODORO:
-      return {
-        ...state,
-        pomodoroState: {
-          ...state.pomodoroState,
-          remaining: action.payload
-        }
-      };
-    
-    case ActionTypes.ADD_ENTRY:
-      return {
-        ...state,
-        dataState: {
-          ...state.dataState,
-          entries: [...state.dataState.entries, action.payload]
-        }
-      };
-    
-    case ActionTypes.DELETE_ENTRY:
-      return {
-        ...state,
-        dataState: {
-          ...state.dataState,
-          entries: state.dataState.entries.filter(e => e.id !== action.payload)
-        }
-      };
-    
-    case ActionTypes.UPDATE_ENTRY:
-      return {
-        ...state,
-        dataState: {
-          ...state.dataState,
-          entries: state.dataState.entries.map(e => 
-            e.id === action.payload.id ? action.payload : e
-          )
-        }
-      };
-    
-    case ActionTypes.SET_ACTIVE_TAB:
-      return {
-        ...state,
-        uiState: {
-          ...state.uiState,
-          activeTab: action.payload
-        }
-      };
-    
-    case ActionTypes.SET_EDITING_ENTRY:
-      return {
-        ...state,
-        uiState: {
-          ...state.uiState,
-          editingEntry: action.payload
-        }
-      };
-    
-    case ActionTypes.SET_SELECTED_CATEGORY:
-      return {
-        ...state,
-        uiState: {
-          ...state.uiState,
-          selectedCategory: action.payload,
-          selectedProject: 'undefined'
-        }
-      };
-    
-    case ActionTypes.SET_SELECTED_PROJECT:
-      return {
-        ...state,
-        uiState: {
-          ...state.uiState,
-          selectedProject: action.payload
-        }
-      };
-    
-    case ActionTypes.ADD_CATEGORY:
-      return {
-        ...state,
-        dataState: {
-          ...state.dataState,
-          categories: {
-            ...state.dataState.categories,
-            [action.payload.name]: {
-              color: action.payload.color,
-              projects: ['undefined']
-            }
-          }
-        }
-      };
-    
-    case ActionTypes.ADD_PROJECT:
-      return {
-        ...state,
-        dataState: {
-          ...state.dataState,
-          categories: {
-            ...state.dataState.categories,
-            [action.payload.category]: {
-              ...state.dataState.categories[action.payload.category],
-              projects: [...state.dataState.categories[action.payload.category].projects, action.payload.project]
-            }
-          }
-        }
-      };
-    
-    case ActionTypes.UPDATE_CATEGORY_COLOR:
-      return {
-        ...state,
-        dataState: {
-          ...state.dataState,
-          categories: {
-            ...state.dataState.categories,
-            [action.payload.category]: {
-              ...state.dataState.categories[action.payload.category],
-              color: action.payload.color
-            }
-          }
-        }
-      };
-    
-    case ActionTypes.SET_DATE_FILTER:
-      return {
-        ...state,
-        uiState: {
-          ...state.uiState,
-          dateFilter: action.payload
-        }
-      };
-    
-    case ActionTypes.SET_CUSTOM_DATE_RANGE:
-      return {
-        ...state,
-        uiState: {
-          ...state.uiState,
-          customDateRange: action.payload
-        }
-      };
-    
-    case ActionTypes.IMPORT_DATA:
-      return {
-        ...state,
-        dataState: {
-          categories: action.payload.categories || state.dataState.categories,
-          entries: action.payload.entries || state.dataState.entries
-        }
-      };
-    
-    default:
-      return state;
-  }
-}
-
-// Timer Display Component - Optimized to prevent parent re-renders
-const TimerDisplay = ({ timerRef, isRunning, startTime }) => {
-  const [displayTime, setDisplayTime] = useState(0);
-  const animationRef = useRef();
-
-  useEffect(() => {
-    if (isRunning) {
-      const updateTimer = () => {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        setDisplayTime(elapsed);
-        timerRef.current = elapsed;
-        animationRef.current = requestAnimationFrame(updateTimer);
-      };
-      animationRef.current = requestAnimationFrame(updateTimer);
-    } else {
-      setDisplayTime(0);
-      timerRef.current = 0;
-    }
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [isRunning, startTime, timerRef]);
-
-  const formatTime = (seconds) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  return <div className="timer-display">{formatTime(displayTime)}</div>;
-};
-
-// Pomodoro Display Component
-const PomodoroDisplay = ({ pomodoroRef, isRunning, isPaused, onComplete }) => {
-  const [displayTime, setDisplayTime] = useState(25 * 60);
-  const animationRef = useRef();
-  const lastUpdateRef = useRef(Date.now());
-
-  useEffect(() => {
-    if (!isPaused) {
-      pomodoroRef.current = 25 * 60;
-      setDisplayTime(25 * 60);
-    }
-  }, [isPaused, pomodoroRef]);
-
-  useEffect(() => {
-    if (isRunning) {
-      const updatePomodoro = () => {
-        const now = Date.now();
-        const delta = Math.floor((now - lastUpdateRef.current) / 1000);
         
-        if (delta >= 1) {
-          const newTime = Math.max(0, pomodoroRef.current - delta);
-          pomodoroRef.current = newTime;
-          setDisplayTime(newTime);
-          lastUpdateRef.current = now;
-
-          if (newTime === 0) {
-            onComplete();
-            return;
-          }
-        }
-
-        animationRef.current = requestAnimationFrame(updatePomodoro);
-      };
-
-      lastUpdateRef.current = Date.now();
-      animationRef.current = requestAnimationFrame(updatePomodoro);
-    }
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [isRunning, onComplete, pomodoroRef]);
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  return <div className="timer-display">{formatTime(displayTime)}</div>;
-};
-
-// XP Message Box Component
-const XPMessageBox = ({ title, message, onOk, onCancel }) => (
-  <div className="xp-overlay">
-    <div className="xp-messagebox">
-      <div className="xp-messagebox-title">
-        <span>{title}</span>
-      </div>
-      <div className="xp-messagebox-content">
-        <div className="xp-messagebox-icon">⚠️</div>
-        <div className="xp-messagebox-text">{message}</div>
-      </div>
-      <div className="xp-messagebox-buttons">
-        <button className="xp-button" onClick={onOk}>OK</button>
-        {onCancel && <button className="xp-button" onClick={onCancel}>Cancel</button>}
-      </div>
-    </div>
-  </div>
-);
-
-// Entry Row Component
-const EntryRow = ({ entry, isEditing, onEdit, onDelete, onSave, onCancelEdit, editNotes, setEditNotes }) => {
-  const formatTime = (seconds) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  return (
-    <div className="entry-item">
-      <div style={{ flex: 1 }}>
-        <strong>{entry.category} - {entry.project}</strong>
-        <br />
-        {new Date(entry.startTime).toLocaleString()} ({formatTime(entry.duration)})
-        {isEditing ? (
-          <div style={{ marginTop: '5px' }}>
-            <input
-              type="text"
-              className="xp-input"
-              value={editNotes}
-              onChange={(e) => setEditNotes(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') onSave(entry);
-                if (e.key === 'Escape') onCancelEdit();
-              }}
-              placeholder="Add notes..."
-              autoFocus
-              style={{ width: '100%' }}
-            />
-          </div>
-        ) : (
-          entry.notes && (
-            <>
-              <br />
-              <em>Notes: {entry.notes}</em>
-            </>
-          )
-        )}
-      </div>
-      <div style={{ display: 'flex', gap: '5px' }}>
-        {isEditing ? (
-          <>
-            <button className="xp-button" onClick={() => onSave(entry)}>
-              <Save size={14} />
-            </button>
-            <button className="xp-button" onClick={onCancelEdit}>
-              <X size={14} />
-            </button>
-          </>
-        ) : (
-          <>
-            <button className="xp-button" onClick={() => onEdit(entry)}>
-              <Edit2 size={14} />
-            </button>
-            <button className="xp-button" onClick={() => onDelete(entry)}>
-              <Trash2 size={14} />
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const XPTimeTracker = () => {
-  const [state, dispatch] = useReducer(appReducer, initialState);
-  const timerRef = useRef(0);
-  const pomodoroRef = useRef(25 * 60);
-  const fileInputRef = useRef(null);
-  const [editNotes, setEditNotes] = useState('');
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
-
-  // Destructure state for easier access
-  const { timerState, pomodoroState, uiState, dataState } = state;
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyPress = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-      switch (e.key) {
-        case ' ':
-          e.preventDefault();
-          if (uiState.activeTab === 'timer') {
-            if (timerState.isRunning) {
-              handleStopTimer();
-            } else {
-              handleStartTimer();
-            }
-          } else if (uiState.activeTab === 'pomodoro') {
-            if (pomodoroState.isRunning) {
-              dispatch({ type: ActionTypes.PAUSE_POMODORO });
-            } else {
-              dispatch({ type: ActionTypes.START_POMODORO });
-            }
-          }
-          break;
-        case 'p':
-        case 'P':
-          dispatch({ type: ActionTypes.SET_ACTIVE_TAB, payload: 'pomodoro' });
-          break;
-        case 't':
-        case 'T':
-          dispatch({ type: ActionTypes.SET_ACTIVE_TAB, payload: 'timer' });
-          break;
-        case 'Escape':
-          if (uiState.editingEntry) {
-            dispatch({ type: ActionTypes.SET_EDITING_ENTRY, payload: null });
-            setEditNotes('');
-          }
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [uiState.activeTab, timerState.isRunning, pomodoroState.isRunning, uiState.editingEntry]);
-
-  // Timer handlers
-  const handleStartTimer = useCallback(() => {
-    dispatch({ type: ActionTypes.START_TIMER });
-  }, []);
-
-  const handleStopTimer = useCallback(() => {
-    const entry = {
-      id: Date.now().toString(),
-      category: timerState.category,
-      project: timerState.project,
-      startTime: new Date(timerState.startTime),
-      endTime: new Date(),
-      duration: timerRef.current,
-      type: 'timer',
-      notes: ''
-    };
-    dispatch({ type: ActionTypes.ADD_ENTRY, payload: entry });
-    dispatch({ type: ActionTypes.STOP_TIMER });
-  }, [timerState]);
-
-  // Pomodoro completion handler
-  const handlePomodoroComplete = useCallback(() => {
-    // Play notification sound using a simpler approach
-    const audio = new Audio();
-    audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhCTGBzvLZizYIG2m98OGBOAlArOjtrVEaF0+S597GojkVWK3r0qBOEwRL';
-    audio.play().catch(() => {}); // Ignore errors if audio playback is blocked
-
-    const entry = {
-      id: Date.now().toString(),
-      category: pomodoroState.category,
-      project: pomodoroState.project,
-      startTime: new Date(Date.now() - 25 * 60 * 1000),
-      endTime: new Date(),
-      duration: 25 * 60,
-      type: 'pomodoro',
-      notes: ''
-    };
-    dispatch({ type: ActionTypes.ADD_ENTRY, payload: entry });
-    dispatch({ type: ActionTypes.RESET_POMODORO });
-  }, [pomodoroState]);
-
-  // Memoized filtered entries
-  const filteredEntries = useMemo(() => {
-    const now = new Date();
-    let filtered = [...dataState.entries];
-
-    switch (uiState.dateFilter) {
-      case 'daily':
-        filtered = dataState.entries.filter(e => {
-          const entryDate = new Date(e.startTime);
-          return entryDate.toDateString() === now.toDateString();
-        });
-        break;
-      case 'weekly':
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        filtered = dataState.entries.filter(e => new Date(e.startTime) >= weekAgo);
-        break;
-      case 'monthly':
-        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        filtered = dataState.entries.filter(e => new Date(e.startTime) >= monthAgo);
-        break;
-      case 'custom':
-        if (uiState.customDateRange.start && uiState.customDateRange.end) {
-          filtered = dataState.entries.filter(e => {
-            const entryDate = new Date(e.startTime);
-            return entryDate >= new Date(uiState.customDateRange.start) && 
-                   entryDate <= new Date(uiState.customDateRange.end);
-          });
-        }
-        break;
-    }
-    return filtered;
-  }, [dataState.entries, uiState.dateFilter, uiState.customDateRange]);
-
-  // Memoized chart data
-  const chartData = useMemo(() => {
-    const data = {};
-
-    filteredEntries.forEach(entry => {
-      const key = `${entry.category}-${entry.project}`;
-      if (!data[key]) {
-        data[key] = {
-          category: entry.category,
-          project: entry.project,
-          duration: 0,
-          color: dataState.categories[entry.category]?.color || '#999'
-        };
-      }
-      data[key].duration += entry.duration;
-    });
-
-    return Object.values(data).map(d => ({
-      name: `${d.category} - ${d.project}`,
-      hours: Number((d.duration / 3600).toFixed(2)),
-      fill: d.color
-    }));
-  }, [filteredEntries, dataState.categories]);
-
-  // Export/Import functions
-  const exportData = () => {
-    const data = {
-      categories: dataState.categories,
-      entries: dataState.entries,
-      exportDate: new Date().toISOString()
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `time-tracker-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const importData = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = JSON.parse(e.target.result);
-          dispatch({ type: ActionTypes.IMPORT_DATA, payload: data });
-        } catch (err) {
-          alert('Invalid file format');
-        }
-      };
-      reader.readAsText(file);
-    }
-  };
-
-  // Entry management handlers
-  const handleEditEntry = (entry) => {
-    dispatch({ type: ActionTypes.SET_EDITING_ENTRY, payload: entry.id });
-    setEditNotes(entry.notes || '');
-  };
-
-  const handleSaveEntry = (entry) => {
-    dispatch({ 
-      type: ActionTypes.UPDATE_ENTRY, 
-      payload: { ...entry, notes: editNotes } 
-    });
-    dispatch({ type: ActionTypes.SET_EDITING_ENTRY, payload: null });
-    setEditNotes('');
-  };
-
-  const handleCancelEdit = () => {
-    dispatch({ type: ActionTypes.SET_EDITING_ENTRY, payload: null });
-    setEditNotes('');
-  };
-
-  const handleDeleteEntry = (entry) => {
-    setDeleteConfirm(entry);
-  };
-
-  const confirmDelete = () => {
-    if (deleteConfirm) {
-      dispatch({ type: ActionTypes.DELETE_ENTRY, payload: deleteConfirm.id });
-      setDeleteConfirm(null);
-    }
-  };
-
-  // XP Window component
-  const XPWindow = ({ children, title }) => (
-    <div className="xp-window">
-      <div className="xp-title-bar">
-        <span className="xp-title">{title}</span>
-        <div className="xp-window-controls">
-          <button className="xp-window-button">_</button>
-          <button className="xp-window-button">□</button>
-          <button className="xp-window-button xp-close">×</button>
-        </div>
-      </div>
-      <div className="xp-window-body">
-        {children}
-      </div>
-    </div>
-  );
-
-  // XP Button component
-  const XPButton = ({ children, onClick, disabled, variant = 'default', ...props }) => (
-    <button 
-      className={`xp-button ${variant}`} 
-      onClick={onClick} 
-      disabled={disabled}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-
-  // XP Tab component
-  const XPTabs = ({ tabs, activeTab, onChange }) => (
-    <div className="xp-tabs">
-      {tabs.map(tab => (
-        <button
-          key={tab.id}
-          className={`xp-tab ${activeTab === tab.id ? 'active' : ''}`}
-          onClick={() => onChange(tab.id)}
-        >
-          {tab.icon && <span className="xp-tab-icon">{tab.icon}</span>}
-          {tab.label}
-        </button>
-      ))}
-    </div>
-  );
-
-  return (
-    <div className="xp-container">
-      <style jsx>{`
         .xp-container {
-          font-family: Tahoma, Geneva, sans-serif;
-          font-size: 11px;
-          background: #ECE9D8;
-          min-height: 100vh;
-          padding: 20px;
+            font-family: Tahoma, Geneva, sans-serif;
+            font-size: 11px;
+            background: #ECE9D8;
+            min-height: 100vh;
+            padding: 20px;
         }
 
         .xp-window {
-          background: #ECE9D8;
-          border: 2px solid;
-          border-color: #ffffff #808080 #808080 #ffffff;
-          box-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-          max-width: 900px;
-          margin: 0 auto;
+            background: #ECE9D8;
+            border: 2px solid;
+            border-color: #ffffff #808080 #808080 #ffffff;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            max-width: 900px;
+            margin: 0 auto;
         }
 
         .xp-title-bar {
-          background: linear-gradient(to bottom, #0055E5, #0044CC);
-          color: white;
-          padding: 3px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          font-weight: bold;
+            background: linear-gradient(to bottom, #0055E5, #0044CC);
+            color: white;
+            padding: 3px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
         }
 
         .xp-title {
-          padding: 0 5px;
+            padding: 0 5px;
         }
 
         .xp-window-controls {
-          display: flex;
-          gap: 2px;
+            display: flex;
+            gap: 2px;
         }
 
         .xp-window-button {
-          background: #D4D0C8;
-          border: 1px solid;
-          border-color: #ffffff #404040 #404040 #ffffff;
-          width: 16px;
-          height: 14px;
-          font-size: 10px;
-          line-height: 1;
-          cursor: pointer;
-          padding: 0;
+            background: #D4D0C8;
+            border: 1px solid;
+            border-color: #ffffff #404040 #404040 #ffffff;
+            width: 16px;
+            height: 14px;
+            font-size: 10px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0;
         }
 
         .xp-window-button:active {
-          border-color: #404040 #ffffff #ffffff #404040;
+            border-color: #404040 #ffffff #ffffff #404040;
         }
 
         .xp-window-button.xp-close {
-          background: #E81123;
-          color: white;
+            background: #E81123;
+            color: white;
         }
 
         .xp-window-body {
-          padding: 8px;
+            padding: 8px;
         }
 
         .xp-button {
-          background: #D4D0C8;
-          border: 2px solid;
-          border-color: #ffffff #808080 #808080 #ffffff;
-          padding: 5px 15px;
-          font-family: Tahoma, Geneva, sans-serif;
-          font-size: 11px;
-          cursor: pointer;
-          min-width: 75px;
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
+            background: #D4D0C8;
+            border: 2px solid;
+            border-color: #ffffff #808080 #808080 #ffffff;
+            padding: 5px 15px;
+            font-family: Tahoma, Geneva, sans-serif;
+            font-size: 11px;
+            cursor: pointer;
+            min-width: 75px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
         }
 
         .xp-button:hover {
-          background: #E4E0D8;
+            background: #E4E0D8;
         }
 
         .xp-button:active {
-          border-color: #808080 #ffffff #ffffff #808080;
-          padding: 6px 14px 4px 16px;
+            border-color: #808080 #ffffff #ffffff #808080;
+            padding: 6px 14px 4px 16px;
         }
 
         .xp-button:disabled {
-          color: #808080;
-          cursor: default;
+            color: #808080;
+            cursor: default;
         }
 
         .xp-tabs {
-          display: flex;
-          gap: 2px;
-          margin-bottom: 10px;
-          border-bottom: 2px solid #ffffff;
+            display: flex;
+            gap: 2px;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #ffffff;
         }
 
         .xp-tab {
-          background: #D4D0C8;
-          border: 1px solid;
-          border-color: #ffffff #808080 transparent #ffffff;
-          padding: 5px 15px;
-          font-family: Tahoma, Geneva, sans-serif;
-          font-size: 11px;
-          cursor: pointer;
-          position: relative;
-          top: 2px;
-          display: flex;
-          align-items: center;
-          gap: 5px;
+            background: #D4D0C8;
+            border: 1px solid;
+            border-color: #ffffff #808080 transparent #ffffff;
+            padding: 5px 15px;
+            font-family: Tahoma, Geneva, sans-serif;
+            font-size: 11px;
+            cursor: pointer;
+            position: relative;
+            top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
 
         .xp-tab.active {
-          background: #ECE9D8;
-          border-bottom-color: #ECE9D8;
-          z-index: 1;
+            background: #ECE9D8;
+            border-bottom-color: #ECE9D8;
+            z-index: 1;
         }
 
         .xp-tab-icon {
-          display: inline-flex;
+            display: inline-flex;
         }
 
         .xp-group {
-          border: 2px groove #ffffff;
-          padding: 10px;
-          margin: 10px 0;
-          position: relative;
+            border: 2px groove #ffffff;
+            padding: 10px;
+            margin: 10px 0;
+            position: relative;
         }
 
         .xp-group-title {
-          position: absolute;
-          top: -8px;
-          left: 10px;
-          background: #ECE9D8;
-          padding: 0 5px;
+            position: absolute;
+            top: -8px;
+            left: 10px;
+            background: #ECE9D8;
+            padding: 0 5px;
         }
 
         .xp-select {
-          background: white;
-          border: 2px inset #ffffff;
-          font-family: Tahoma, Geneva, sans-serif;
-          font-size: 11px;
-          padding: 2px;
-          width: 200px;
+            background: white;
+            border: 2px inset #ffffff;
+            font-family: Tahoma, Geneva, sans-serif;
+            font-size: 11px;
+            padding: 2px;
+            width: 200px;
         }
 
         .xp-input {
-          background: white;
-          border: 2px inset #ffffff;
-          font-family: Tahoma, Geneva, sans-serif;
-          font-size: 11px;
-          padding: 2px 4px;
+            background: white;
+            border: 2px inset #ffffff;
+            font-family: Tahoma, Geneva, sans-serif;
+            font-size: 11px;
+            padding: 2px 4px;
         }
 
         .timer-display {
-          font-size: 48px;
-          font-family: 'Courier New', monospace;
-          text-align: center;
-          margin: 20px 0;
-          color: #000080;
+            font-size: 48px;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            margin: 20px 0;
+            color: #000080;
         }
 
         .control-group {
-          display: flex;
-          gap: 10px;
-          justify-content: center;
-          margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
         }
 
         .entry-list {
-          height: 300px;
-          overflow-y: auto;
-          border: 2px inset #ffffff;
-          background: white;
+            height: 300px;
+            overflow-y: auto;
+            border: 2px inset #ffffff;
+            background: white;
         }
 
         .entry-item {
-          padding: 5px 10px;
-          border-bottom: 1px solid #D4D0C8;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
+            padding: 5px 10px;
+            border-bottom: 1px solid #D4D0C8;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .entry-item:hover {
-          background: #E8F0FF;
+            background: #E8F0FF;
         }
 
         .data-warning {
-          background: #FFF4C4;
-          border: 1px solid #DDB800;
-          padding: 10px;
-          margin: 10px 0;
-          display: flex;
-          align-items: center;
-          gap: 10px;
+            background: #FFF4C4;
+            border: 1px solid #DDB800;
+            padding: 10px;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .chart-container {
-          height: 300px;
-          margin: 20px 0;
+            height: 300px;
+            margin: 20px 0;
         }
 
         .color-picker {
-          width: 30px;
-          height: 20px;
-          border: 2px inset #ffffff;
-          cursor: pointer;
+            width: 30px;
+            height: 20px;
+            border: 2px inset #ffffff;
+            cursor: pointer;
         }
 
         .xp-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.3);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
         }
 
         .xp-messagebox {
-          background: #ECE9D8;
-          border: 2px solid;
-          border-color: #ffffff #808080 #808080 #ffffff;
-          box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
-          min-width: 300px;
+            background: #ECE9D8;
+            border: 2px solid;
+            border-color: #ffffff #808080 #808080 #ffffff;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            min-width: 300px;
         }
 
         .xp-messagebox-title {
-          background: linear-gradient(to bottom, #0055E5, #0044CC);
-          color: white;
-          padding: 3px 5px;
-          font-weight: bold;
+            background: linear-gradient(to bottom, #0055E5, #0044CC);
+            color: white;
+            padding: 3px 5px;
+            font-weight: bold;
         }
 
         .xp-messagebox-content {
-          padding: 20px;
-          display: flex;
-          gap: 15px;
-          align-items: center;
+            padding: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
         }
 
         .xp-messagebox-icon {
-          font-size: 32px;
+            font-size: 32px;
         }
 
         .xp-messagebox-buttons {
-          padding: 10px 20px;
-          display: flex;
-          gap: 10px;
-          justify-content: flex-end;
+            padding: 10px 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
         }
 
         .keyboard-hint {
-          font-size: 10px;
-          color: #666;
-          text-align: center;
-          margin-top: 10px;
+            font-size: 10px;
+            color: #666;
+            text-align: center;
+            margin-top: 10px;
         }
-      `}</style>
 
-      {deleteConfirm && (
-        <XPMessageBox
-          title="Confirm Delete"
-          message={`Are you sure you want to delete this entry?`}
-          onOk={confirmDelete}
-          onCancel={() => setDeleteConfirm(null)}
-        />
-      )}
+        /* Simple icons */
+        .icon {
+            width: 14px;
+            height: 14px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-      <XPWindow title="Windows XP Time Tracker">
-        <div className="data-warning">
-          <span>⚠️</span>
-          <span>Note: Data is only stored during this session. Use Export/Import to save your data permanently.</span>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
-            <XPButton onClick={exportData}>
-              <Download size={14} /> Export
-            </XPButton>
-            <XPButton onClick={() => fileInputRef.current?.click()}>
-              <Upload size={14} /> Import
-            </XPButton>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              onChange={importData}
-              style={{ display: 'none' }}
-            />
-          </div>
-        </div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo, useCallback, useReducer } = React;
+        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = Recharts;
 
-        <XPTabs
-          tabs={[
-            { id: 'timer', label: 'Timer', icon: <Clock size={14} /> },
-            { id: 'pomodoro', label: 'Pomodoro', icon: <Clock size={14} /> },
-            { id: 'data', label: 'Data', icon: <BarChart3 size={14} /> },
-            { id: 'settings', label: 'Settings', icon: <Settings size={14} /> }
-          ]}
-          activeTab={uiState.activeTab}
-          onChange={(tab) => dispatch({ type: ActionTypes.SET_ACTIVE_TAB, payload: tab })}
-        />
+        // Simple icon components
+        const Icons = {
+            Play: () => <span className="icon">▶</span>,
+            Pause: () => <span className="icon">⏸</span>,
+            Square: () => <span className="icon">⏹</span>,
+            Download: () => <span className="icon">⬇</span>,
+            Upload: () => <span className="icon">⬆</span>,
+            Trash2: () => <span className="icon">🗑</span>,
+            Edit2: () => <span className="icon">✏</span>,
+            Save: () => <span className="icon">💾</span>,
+            X: () => <span className="icon">✖</span>,
+            Clock: () => <span className="icon">🕐</span>,
+            BarChart3: () => <span className="icon">📊</span>,
+            Settings: () => <span className="icon">⚙</span>
+        };
 
-        {uiState.activeTab === 'timer' && (
-          <div>
-            <div className="xp-group">
-              <span className="xp-group-title">Timer Settings</span>
-              <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginTop: '10px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px' }}>Category:</label>
-                  <select 
-                    className="xp-select" 
-                    value={uiState.selectedCategory}
-                    onChange={(e) => dispatch({ type: ActionTypes.SET_SELECTED_CATEGORY, payload: e.target.value })}
-                    disabled={timerState.isRunning}
-                  >
-                    {Object.keys(dataState.categories).map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px' }}>Project:</label>
-                  <select 
-                    className="xp-select" 
-                    value={uiState.selectedProject}
-                    onChange={(e) => dispatch({ type: ActionTypes.SET_SELECTED_PROJECT, payload: e.target.value })}
-                    disabled={timerState.isRunning}
-                  >
-                    {dataState.categories[uiState.selectedCategory]?.projects.map(proj => (
-                      <option key={proj} value={proj}>{proj}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
+        // Action types for reducer
+        const ActionTypes = {
+            START_TIMER: 'START_TIMER',
+            STOP_TIMER: 'STOP_TIMER',
+            UPDATE_TIMER: 'UPDATE_TIMER',
+            START_POMODORO: 'START_POMODORO',
+            PAUSE_POMODORO: 'PAUSE_POMODORO',
+            RESET_POMODORO: 'RESET_POMODORO',
+            UPDATE_POMODORO: 'UPDATE_POMODORO',
+            ADD_ENTRY: 'ADD_ENTRY',
+            DELETE_ENTRY: 'DELETE_ENTRY',
+            UPDATE_ENTRY: 'UPDATE_ENTRY',
+            SET_CATEGORIES: 'SET_CATEGORIES',
+            ADD_CATEGORY: 'ADD_CATEGORY',
+            ADD_PROJECT: 'ADD_PROJECT',
+            UPDATE_CATEGORY_COLOR: 'UPDATE_CATEGORY_COLOR',
+            SET_ACTIVE_TAB: 'SET_ACTIVE_TAB',
+            SET_DATE_FILTER: 'SET_DATE_FILTER',
+            SET_CUSTOM_DATE_RANGE: 'SET_CUSTOM_DATE_RANGE',
+            SET_EDITING_ENTRY: 'SET_EDITING_ENTRY',
+            SET_SELECTED_CATEGORY: 'SET_SELECTED_CATEGORY',
+            SET_SELECTED_PROJECT: 'SET_SELECTED_PROJECT',
+            IMPORT_DATA: 'IMPORT_DATA'
+        };
 
-            <TimerDisplay 
-              timerRef={timerRef} 
-              isRunning={timerState.isRunning} 
-              startTime={timerState.startTime} 
-            />
+        // Initial state
+        const initialState = {
+            timerState: {
+                isRunning: false,
+                startTime: null,
+                elapsed: 0,
+                category: 'Work',
+                project: 'undefined'
+            },
+            pomodoroState: {
+                isRunning: false,
+                isPaused: false,
+                remaining: 25 * 60,
+                category: 'Work',
+                project: 'undefined'
+            },
+            uiState: {
+                activeTab: 'timer',
+                editingEntry: null,
+                dateFilter: 'daily',
+                customDateRange: { start: '', end: '' },
+                selectedCategory: 'Work',
+                selectedProject: 'undefined'
+            },
+            dataState: {
+                categories: {
+                    'Work': { color: '#0078D7', projects: ['undefined', 'Project A', 'Project B'] },
+                    'Personal': { color: '#5CB85C', projects: ['undefined', 'Exercise', 'Reading'] }
+                },
+                entries: []
+            }
+        };
 
-            <div className="control-group">
-              {!timerState.isRunning ? (
-                <XPButton onClick={handleStartTimer}>
-                  <Play size={16} /> Start
-                </XPButton>
-              ) : (
-                <XPButton onClick={handleStopTimer}>
-                  <Square size={16} /> Stop
-                </XPButton>
-              )}
-            </div>
+        // Reducer function
+        function appReducer(state, action) {
+            switch (action.type) {
+                case ActionTypes.START_TIMER:
+                    return {
+                        ...state,
+                        timerState: {
+                            ...state.timerState,
+                            isRunning: true,
+                            startTime: Date.now(),
+                            elapsed: 0,
+                            category: state.uiState.selectedCategory,
+                            project: state.uiState.selectedProject
+                        }
+                    };
+                
+                case ActionTypes.STOP_TIMER:
+                    return {
+                        ...state,
+                        timerState: {
+                            ...state.timerState,
+                            isRunning: false,
+                            startTime: null,
+                            elapsed: 0
+                        }
+                    };
+                
+                case ActionTypes.START_POMODORO:
+                    return {
+                        ...state,
+                        pomodoroState: {
+                            ...state.pomodoroState,
+                            isRunning: true,
+                            isPaused: false,
+                            category: state.uiState.selectedCategory,
+                            project: state.uiState.selectedProject
+                        }
+                    };
+                
+                case ActionTypes.PAUSE_POMODORO:
+                    return {
+                        ...state,
+                        pomodoroState: {
+                            ...state.pomodoroState,
+                            isRunning: false,
+                            isPaused: true
+                        }
+                    };
+                
+                case ActionTypes.RESET_POMODORO:
+                    return {
+                        ...state,
+                        pomodoroState: {
+                            ...state.pomodoroState,
+                            isRunning: false,
+                            isPaused: false,
+                            remaining: 25 * 60
+                        }
+                    };
+                
+                case ActionTypes.ADD_ENTRY:
+                    return {
+                        ...state,
+                        dataState: {
+                            ...state.dataState,
+                            entries: [...state.dataState.entries, action.payload]
+                        }
+                    };
+                
+                case ActionTypes.DELETE_ENTRY:
+                    return {
+                        ...state,
+                        dataState: {
+                            ...state.dataState,
+                            entries: state.dataState.entries.filter(e => e.id !== action.payload)
+                        }
+                    };
+                
+                case ActionTypes.UPDATE_ENTRY:
+                    return {
+                        ...state,
+                        dataState: {
+                            ...state.dataState,
+                            entries: state.dataState.entries.map(e => 
+                                e.id === action.payload.id ? action.payload : e
+                            )
+                        }
+                    };
+                
+                case ActionTypes.SET_ACTIVE_TAB:
+                    return {
+                        ...state,
+                        uiState: {
+                            ...state.uiState,
+                            activeTab: action.payload
+                        }
+                    };
+                
+                case ActionTypes.SET_EDITING_ENTRY:
+                    return {
+                        ...state,
+                        uiState: {
+                            ...state.uiState,
+                            editingEntry: action.payload
+                        }
+                    };
+                
+                case ActionTypes.SET_SELECTED_CATEGORY:
+                    return {
+                        ...state,
+                        uiState: {
+                            ...state.uiState,
+                            selectedCategory: action.payload,
+                            selectedProject: 'undefined'
+                        }
+                    };
+                
+                case ActionTypes.SET_SELECTED_PROJECT:
+                    return {
+                        ...state,
+                        uiState: {
+                            ...state.uiState,
+                            selectedProject: action.payload
+                        }
+                    };
+                
+                case ActionTypes.ADD_CATEGORY:
+                    return {
+                        ...state,
+                        dataState: {
+                            ...state.dataState,
+                            categories: {
+                                ...state.dataState.categories,
+                                [action.payload.name]: {
+                                    color: action.payload.color,
+                                    projects: ['undefined']
+                                }
+                            }
+                        }
+                    };
+                
+                case ActionTypes.ADD_PROJECT:
+                    return {
+                        ...state,
+                        dataState: {
+                            ...state.dataState,
+                            categories: {
+                                ...state.dataState.categories,
+                                [action.payload.category]: {
+                                    ...state.dataState.categories[action.payload.category],
+                                    projects: [...state.dataState.categories[action.payload.category].projects, action.payload.project]
+                                }
+                            }
+                        }
+                    };
+                
+                case ActionTypes.UPDATE_CATEGORY_COLOR:
+                    return {
+                        ...state,
+                        dataState: {
+                            ...state.dataState,
+                            categories: {
+                                ...state.dataState.categories,
+                                [action.payload.category]: {
+                                    ...state.dataState.categories[action.payload.category],
+                                    color: action.payload.color
+                                }
+                            }
+                        }
+                    };
+                
+                case ActionTypes.SET_DATE_FILTER:
+                    return {
+                        ...state,
+                        uiState: {
+                            ...state.uiState,
+                            dateFilter: action.payload
+                        }
+                    };
+                
+                case ActionTypes.SET_CUSTOM_DATE_RANGE:
+                    return {
+                        ...state,
+                        uiState: {
+                            ...state.uiState,
+                            customDateRange: action.payload
+                        }
+                    };
+                
+                case ActionTypes.IMPORT_DATA:
+                    return {
+                        ...state,
+                        dataState: {
+                            categories: action.payload.categories || state.dataState.categories,
+                            entries: action.payload.entries || state.dataState.entries
+                        }
+                    };
+                
+                default:
+                    return state;
+            }
+        }
 
-            {timerState.isRunning && (
-              <div style={{ textAlign: 'center', marginTop: '20px' }}>
-                <p>Tracking: {timerState.category} - {timerState.project}</p>
-              </div>
-            )}
+        // Timer Display Component
+        const TimerDisplay = ({ timerRef, isRunning, startTime }) => {
+            const [displayTime, setDisplayTime] = useState(0);
+            const animationRef = useRef();
 
-            <div className="keyboard-hint">
-              Press SPACE to start/stop • T for Timer • P for Pomodoro
-            </div>
-          </div>
-        )}
+            useEffect(() => {
+                if (isRunning) {
+                    const updateTimer = () => {
+                        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                        setDisplayTime(elapsed);
+                        timerRef.current = elapsed;
+                        animationRef.current = requestAnimationFrame(updateTimer);
+                    };
+                    animationRef.current = requestAnimationFrame(updateTimer);
+                } else {
+                    setDisplayTime(0);
+                    timerRef.current = 0;
+                }
 
-        {uiState.activeTab === 'pomodoro' && (
-          <div>
-            <div className="xp-group">
-              <span className="xp-group-title">Pomodoro Settings</span>
-              <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginTop: '10px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px' }}>Category:</label>
-                  <select 
-                    className="xp-select" 
-                    value={uiState.selectedCategory}
-                    onChange={(e) => dispatch({ type: ActionTypes.SET_SELECTED_CATEGORY, payload: e.target.value })}
-                    disabled={pomodoroState.isRunning}
-                  >
-                    {Object.keys(dataState.categories).map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '5px' }}>Project:</label>
-                  <select 
-                    className="xp-select" 
-                    value={uiState.selectedProject}
-                    onChange={(e) => dispatch({ type: ActionTypes.SET_SELECTED_PROJECT, payload: e.target.value })}
-                    disabled={pomodoroState.isRunning}
-                  >
-                    {dataState.categories[uiState.selectedCategory]?.projects.map(proj => (
-                      <option key={proj} value={proj}>{proj}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
+                return () => {
+                    if (animationRef.current) {
+                        cancelAnimationFrame(animationRef.current);
+                    }
+                };
+            }, [isRunning, startTime, timerRef]);
 
-            <PomodoroDisplay
-              pomodoroRef={pomodoroRef}
-              isRunning={pomodoroState.isRunning}
-              isPaused={pomodoroState.isPaused}
-              onComplete={handlePomodoroComplete}
-            />
+            const formatTime = (seconds) => {
+                const hrs = Math.floor(seconds / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                const secs = seconds % 60;
+                return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            };
 
-            <div className="control-group">
-              {!pomodoroState.isRunning ? (
-                <XPButton onClick={() => dispatch({ type: ActionTypes.START_POMODORO })}>
-                  <Play size={16} /> Start
-                </XPButton>
-              ) : (
-                <XPButton onClick={() => dispatch({ type: ActionTypes.PAUSE_POMODORO })}>
-                  <Pause size={16} /> Pause
-                </XPButton>
-              )}
-              <XPButton onClick={() => dispatch({ type: ActionTypes.RESET_POMODORO })}>
-                <Square size={16} /> Reset
-              </XPButton>
-            </div>
+            return <div className="timer-display">{formatTime(displayTime)}</div>;
+        };
 
-            <div className="keyboard-hint">
-              Press SPACE to start/pause • Audio notification on completion
-            </div>
-          </div>
-        )}
+        // Pomodoro Display Component
+        const PomodoroDisplay = ({ pomodoroRef, isRunning, isPaused, onComplete }) => {
+            const [displayTime, setDisplayTime] = useState(25 * 60);
+            const animationRef = useRef();
+            const lastUpdateRef = useRef(Date.now());
 
-        {uiState.activeTab === 'data' && (
-          <div>
-            <div className="xp-group">
-              <span className="xp-group-title">Date Filter</span>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
-                <select 
-                  className="xp-select" 
-                  value={uiState.dateFilter}
-                  onChange={(e) => dispatch({ type: ActionTypes.SET_DATE_FILTER, payload: e.target.value })}
-                >
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                  <option value="custom">Custom Range</option>
-                </select>
-                {uiState.dateFilter === 'custom' && (
-                  <>
-                    <input
-                      type="date"
-                      className="xp-input"
-                      value={uiState.customDateRange.start}
-                      onChange={(e) => dispatch({ 
-                        type: ActionTypes.SET_CUSTOM_DATE_RANGE, 
-                        payload: { ...uiState.customDateRange, start: e.target.value } 
-                      })}
-                    />
-                    <span>to</span>
-                    <input
-                      type="date"
-                      className="xp-input"
-                      value={uiState.customDateRange.end}
-                      onChange={(e) => dispatch({ 
-                        type: ActionTypes.SET_CUSTOM_DATE_RANGE, 
-                        payload: { ...uiState.customDateRange, end: e.target.value } 
-                      })}
-                    />
-                  </>
-                )}
-              </div>
-            </div>
+            useEffect(() => {
+                if (!isPaused) {
+                    pomodoroRef.current = 25 * 60;
+                    setDisplayTime(25 * 60);
+                }
+            }, [isPaused, pomodoroRef]);
 
-            <div className="xp-group">
-              <span className="xp-group-title">Time Distribution</span>
-              <div className="chart-container">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                    <YAxis label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
-                    <Tooltip />
-                    <Bar dataKey="hours" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+            useEffect(() => {
+                if (isRunning) {
+                    const updatePomodoro = () => {
+                        const now = Date.now();
+                        const delta = Math.floor((now - lastUpdateRef.current) / 1000);
+                        
+                        if (delta >= 1) {
+                            const newTime = Math.max(0, pomodoroRef.current - delta);
+                            pomodoroRef.current = newTime;
+                            setDisplayTime(newTime);
+                            lastUpdateRef.current = now;
 
-            <div className="xp-group">
-              <span className="xp-group-title">Entries ({filteredEntries.length})</span>
-              <div className="entry-list">
-                {filteredEntries.map(entry => (
-                  <EntryRow
-                    key={entry.id}
-                    entry={entry}
-                    isEditing={uiState.editingEntry === entry.id}
-                    onEdit={handleEditEntry}
-                    onDelete={handleDeleteEntry}
-                    onSave={handleSaveEntry}
-                    onCancelEdit={handleCancelEdit}
-                    editNotes={editNotes}
-                    setEditNotes={setEditNotes}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+                            if (newTime === 0) {
+                                onComplete();
+                                return;
+                            }
+                        }
 
-        {uiState.activeTab === 'settings' && (
-          <div>
-            <div className="xp-group">
-              <span className="xp-group-title">Categories & Projects</span>
-              <div style={{ marginTop: '10px' }}>
-                {Object.entries(dataState.categories).map(([catName, catData]) => (
-                  <div key={catName} style={{ marginBottom: '15px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px' }}>
-                      <input
-                        type="color"
-                        className="color-picker"
-                        value={catData.color}
-                        onChange={(e) => dispatch({ 
-                          type: ActionTypes.UPDATE_CATEGORY_COLOR, 
-                          payload: { category: catName, color: e.target.value } 
-                        })}
-                      />
-                      <strong>{catName}</strong>
+                        animationRef.current = requestAnimationFrame(updatePomodoro);
+                    };
+
+                    lastUpdateRef.current = Date.now();
+                    animationRef.current = requestAnimationFrame(updatePomodoro);
+                }
+
+                return () => {
+                    if (animationRef.current) {
+                        cancelAnimationFrame(animationRef.current);
+                    }
+                };
+            }, [isRunning, onComplete, pomodoroRef]);
+
+            const formatTime = (seconds) => {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            };
+
+            return <div className="timer-display">{formatTime(displayTime)}</div>;
+        };
+
+        // XP Message Box Component
+        const XPMessageBox = ({ title, message, onOk, onCancel }) => (
+            <div className="xp-overlay">
+                <div className="xp-messagebox">
+                    <div className="xp-messagebox-title">
+                        <span>{title}</span>
                     </div>
-                    <div style={{ marginLeft: '40px' }}>
-                      {catData.projects.map((proj, idx) => (
-                        <div key={idx} style={{ marginBottom: '3px' }}>
-                          • {proj}
-                        </div>
-                      ))}
-                      <XPButton 
-                        style={{ marginTop: '5px' }}
-                        onClick={() => {
-                          const newProject = prompt('Enter new project name:');
-                          if (newProject && !catData.projects.includes(newProject)) {
-                            dispatch({ 
-                              type: ActionTypes.ADD_PROJECT, 
-                              payload: { category: catName, project: newProject } 
+                    <div className="xp-messagebox-content">
+                        <div className="xp-messagebox-icon">⚠️</div>
+                        <div className="xp-messagebox-text">{message}</div>
+                    </div>
+                    <div className="xp-messagebox-buttons">
+                        <button className="xp-button" onClick={onOk}>OK</button>
+                        {onCancel && <button className="xp-button" onClick={onCancel}>Cancel</button>}
+                    </div>
+                </div>
+            </div>
+        );
+
+        // Entry Row Component
+        const EntryRow = ({ entry, isEditing, onEdit, onDelete, onSave, onCancelEdit, editNotes, setEditNotes }) => {
+            const formatTime = (seconds) => {
+                const hrs = Math.floor(seconds / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                const secs = seconds % 60;
+                return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            };
+
+            return (
+                <div className="entry-item">
+                    <div style={{ flex: 1 }}>
+                        <strong>{entry.category} - {entry.project}</strong>
+                        <br />
+                        {new Date(entry.startTime).toLocaleString()} ({formatTime(entry.duration)})
+                        {isEditing ? (
+                            <div style={{ marginTop: '5px' }}>
+                                <input
+                                    type="text"
+                                    className="xp-input"
+                                    value={editNotes}
+                                    onChange={(e) => setEditNotes(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') onSave(entry);
+                                        if (e.key === 'Escape') onCancelEdit();
+                                    }}
+                                    placeholder="Add notes..."
+                                    autoFocus
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                        ) : (
+                            entry.notes && (
+                                <>
+                                    <br />
+                                    <em>Notes: {entry.notes}</em>
+                                </>
+                            )
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                        {isEditing ? (
+                            <>
+                                <button className="xp-button" onClick={() => onSave(entry)}>
+                                    <Icons.Save />
+                                </button>
+                                <button className="xp-button" onClick={onCancelEdit}>
+                                    <Icons.X />
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button className="xp-button" onClick={() => onEdit(entry)}>
+                                    <Icons.Edit2 />
+                                </button>
+                                <button className="xp-button" onClick={() => onDelete(entry)}>
+                                    <Icons.Trash2 />
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // Main Component
+        const XPTimeTracker = () => {
+            const [state, dispatch] = useReducer(appReducer, initialState);
+            const timerRef = useRef(0);
+            const pomodoroRef = useRef(25 * 60);
+            const fileInputRef = useRef(null);
+            const [editNotes, setEditNotes] = useState('');
+            const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+            const { timerState, pomodoroState, uiState, dataState } = state;
+
+            // Keyboard shortcuts
+            useEffect(() => {
+                const handleKeyPress = (e) => {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+                    switch (e.key) {
+                        case ' ':
+                            e.preventDefault();
+                            if (uiState.activeTab === 'timer') {
+                                if (timerState.isRunning) {
+                                    handleStopTimer();
+                                } else {
+                                    handleStartTimer();
+                                }
+                            } else if (uiState.activeTab === 'pomodoro') {
+                                if (pomodoroState.isRunning) {
+                                    dispatch({ type: ActionTypes.PAUSE_POMODORO });
+                                } else {
+                                    dispatch({ type: ActionTypes.START_POMODORO });
+                                }
+                            }
+                            break;
+                        case 'p':
+                        case 'P':
+                            dispatch({ type: ActionTypes.SET_ACTIVE_TAB, payload: 'pomodoro' });
+                            break;
+                        case 't':
+                        case 'T':
+                            dispatch({ type: ActionTypes.SET_ACTIVE_TAB, payload: 'timer' });
+                            break;
+                        case 'Escape':
+                            if (uiState.editingEntry) {
+                                dispatch({ type: ActionTypes.SET_EDITING_ENTRY, payload: null });
+                                setEditNotes('');
+                            }
+                            break;
+                    }
+                };
+
+                window.addEventListener('keydown', handleKeyPress);
+                return () => window.removeEventListener('keydown', handleKeyPress);
+            }, [uiState.activeTab, timerState.isRunning, pomodoroState.isRunning, uiState.editingEntry]);
+
+            // Timer handlers
+            const handleStartTimer = useCallback(() => {
+                dispatch({ type: ActionTypes.START_TIMER });
+            }, []);
+
+            const handleStopTimer = useCallback(() => {
+                const entry = {
+                    id: Date.now().toString(),
+                    category: timerState.category,
+                    project: timerState.project,
+                    startTime: new Date(timerState.startTime),
+                    endTime: new Date(),
+                    duration: timerRef.current,
+                    type: 'timer',
+                    notes: ''
+                };
+                dispatch({ type: ActionTypes.ADD_ENTRY, payload: entry });
+                dispatch({ type: ActionTypes.STOP_TIMER });
+            }, [timerState]);
+
+            // Pomodoro completion handler
+            const handlePomodoroComplete = useCallback(() => {
+                const audio = new Audio();
+                audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhCTGBzvLZizYIG2m98OGBOAlArOjtrVEaF0+S597GojkVWK3r0qBOEwRL';
+                audio.play().catch(() => {});
+
+                const entry = {
+                    id: Date.now().toString(),
+                    category: pomodoroState.category,
+                    project: pomodoroState.project,
+                    startTime: new Date(Date.now() - 25 * 60 * 1000),
+                    endTime: new Date(),
+                    duration: 25 * 60,
+                    type: 'pomodoro',
+                    notes: ''
+                };
+                dispatch({ type: ActionTypes.ADD_ENTRY, payload: entry });
+                dispatch({ type: ActionTypes.RESET_POMODORO });
+            }, [pomodoroState]);
+
+            // Memoized filtered entries
+            const filteredEntries = useMemo(() => {
+                const now = new Date();
+                let filtered = [...dataState.entries];
+
+                switch (uiState.dateFilter) {
+                    case 'daily':
+                        filtered = dataState.entries.filter(e => {
+                            const entryDate = new Date(e.startTime);
+                            return entryDate.toDateString() === now.toDateString();
+                        });
+                        break;
+                    case 'weekly':
+                        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                        filtered = dataState.entries.filter(e => new Date(e.startTime) >= weekAgo);
+                        break;
+                    case 'monthly':
+                        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                        filtered = dataState.entries.filter(e => new Date(e.startTime) >= monthAgo);
+                        break;
+                    case 'custom':
+                        if (uiState.customDateRange.start && uiState.customDateRange.end) {
+                            filtered = dataState.entries.filter(e => {
+                                const entryDate = new Date(e.startTime);
+                                return entryDate >= new Date(uiState.customDateRange.start) && 
+                                       entryDate <= new Date(uiState.customDateRange.end);
                             });
-                          }
-                        }}
-                      >
-                        Add Project
-                      </XPButton>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <XPButton 
-                style={{ marginTop: '15px' }}
-                onClick={() => {
-                  const newCategory = prompt('Enter new category name:');
-                  if (newCategory && !dataState.categories[newCategory]) {
-                    dispatch({ 
-                      type: ActionTypes.ADD_CATEGORY, 
-                      payload: { 
-                        name: newCategory, 
-                        color: '#' + Math.floor(Math.random()*16777215).toString(16) 
-                      } 
-                    });
-                  }
-                }}
-              >
-                Add Category
-              </XPButton>
-            </div>
-          </div>
-        )}
-      </XPWindow>
-    </div>
-  );
-};
+                        }
+                        break;
+                }
+                return filtered;
+            }, [dataState.entries, uiState.dateFilter, uiState.customDateRange]);
 
-export default XPTimeTracker;
+            // Memoized chart data
+            const chartData = useMemo(() => {
+                const data = {};
+
+                filteredEntries.forEach(entry => {
+                    const key = `${entry.category}-${entry.project}`;
+                    if (!data[key]) {
+                        data[key] = {
+                            category: entry.category,
+                            project: entry.project,
+                            duration: 0,
+                            color: dataState.categories[entry.category]?.color || '#999'
+                        };
+                    }
+                    data[key].duration += entry.duration;
+                });
+
+                return Object.values(data).map(d => ({
+                    name: `${d.category} - ${d.project}`,
+                    hours: Number((d.duration / 3600).toFixed(2)),
+                    fill: d.color
+                }));
+            }, [filteredEntries, dataState.categories]);
+
+            // Export/Import functions
+            const exportData = () => {
+                const data = {
+                    categories: dataState.categories,
+                    entries: dataState.entries,
+                    exportDate: new Date().toISOString()
+                };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `time-tracker-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            const importData = (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = JSON.parse(e.target.result);
+                            dispatch({ type: ActionTypes.IMPORT_DATA, payload: data });
+                        } catch (err) {
+                            alert('Invalid file format');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+
+            // Entry management handlers
+            const handleEditEntry = (entry) => {
+                dispatch({ type: ActionTypes.SET_EDITING_ENTRY, payload: entry.id });
+                setEditNotes(entry.notes || '');
+            };
+
+            const handleSaveEntry = (entry) => {
+                dispatch({ 
+                    type: ActionTypes.UPDATE_ENTRY, 
+                    payload: { ...entry, notes: editNotes } 
+                });
+                dispatch({ type: ActionTypes.SET_EDITING_ENTRY, payload: null });
+                setEditNotes('');
+            };
+
+            const handleCancelEdit = () => {
+                dispatch({ type: ActionTypes.SET_EDITING_ENTRY, payload: null });
+                setEditNotes('');
+            };
+
+            const handleDeleteEntry = (entry) => {
+                setDeleteConfirm(entry);
+            };
+
+            const confirmDelete = () => {
+                if (deleteConfirm) {
+                    dispatch({ type: ActionTypes.DELETE_ENTRY, payload: deleteConfirm.id });
+                    setDeleteConfirm(null);
+                }
+            };
+
+            // XP Window component
+            const XPWindow = ({ children, title }) => (
+                <div className="xp-window">
+                    <div className="xp-title-bar">
+                        <span className="xp-title">{title}</span>
+                        <div className="xp-window-controls">
+                            <button className="xp-window-button">_</button>
+                            <button className="xp-window-button">□</button>
+                            <button className="xp-window-button xp-close">×</button>
+                        </div>
+                    </div>
+                    <div className="xp-window-body">
+                        {children}
+                    </div>
+                </div>
+            );
+
+            // XP Button component
+            const XPButton = ({ children, onClick, disabled, variant = 'default', ...props }) => (
+                <button 
+                    className={`xp-button ${variant}`} 
+                    onClick={onClick} 
+                    disabled={disabled}
+                    {...props}
+                >
+                    {children}
+                </button>
+            );
+
+            // XP Tab component
+            const XPTabs = ({ tabs, activeTab, onChange }) => (
+                <div className="xp-tabs">
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            className={`xp-tab ${activeTab === tab.id ? 'active' : ''}`}
+                            onClick={() => onChange(tab.id)}
+                        >
+                            {tab.icon && <span className="xp-tab-icon">{tab.icon}</span>}
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+            );
+
+            return (
+                <div className="xp-container">
+                    {deleteConfirm && (
+                        <XPMessageBox
+                            title="Confirm Delete"
+                            message={`Are you sure you want to delete this entry?`}
+                            onOk={confirmDelete}
+                            onCancel={() => setDeleteConfirm(null)}
+                        />
+                    )}
+
+                    <XPWindow title="Windows XP Time Tracker">
+                        <div className="data-warning">
+                            <span>⚠️</span>
+                            <span>Note: Data is only stored during this session. Use Export/Import to save your data permanently.</span>
+                            <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
+                                <XPButton onClick={exportData}>
+                                    <Icons.Download /> Export
+                                </XPButton>
+                                <XPButton onClick={() => fileInputRef.current?.click()}>
+                                    <Icons.Upload /> Import
+                                </XPButton>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".json"
+                                    onChange={importData}
+                                    style={{ display: 'none' }}
+                                />
+                            </div>
+                        </div>
+
+                        <XPTabs
+                            tabs={[
+                                { id: 'timer', label: 'Timer', icon: <Icons.Clock /> },
+                                { id: 'pomodoro', label: 'Pomodoro', icon: <Icons.Clock /> },
+                                { id: 'data', label: 'Data', icon: <Icons.BarChart3 /> },
+                                { id: 'settings', label: 'Settings', icon: <Icons.Settings /> }
+                            ]}
+                            activeTab={uiState.activeTab}
+                            onChange={(tab) => dispatch({ type: ActionTypes.SET_ACTIVE_TAB, payload: tab })}
+                        />
+
+                        {uiState.activeTab === 'timer' && (
+                            <div>
+                                <div className="xp-group">
+                                    <span className="xp-group-title">Timer Settings</span>
+                                    <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginTop: '10px' }}>
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '5px' }}>Category:</label>
+                                            <select 
+                                                className="xp-select" 
+                                                value={uiState.selectedCategory}
+                                                onChange={(e) => dispatch({ type: ActionTypes.SET_SELECTED_CATEGORY, payload: e.target.value })}
+                                                disabled={timerState.isRunning}
+                                            >
+                                                {Object.keys(dataState.categories).map(cat => (
+                                                    <option key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '5px' }}>Project:</label>
+                                            <select 
+                                                className="xp-select" 
+                                                value={uiState.selectedProject}
+                                                onChange={(e) => dispatch({ type: ActionTypes.SET_SELECTED_PROJECT, payload: e.target.value })}
+                                                disabled={timerState.isRunning}
+                                            >
+                                                {dataState.categories[uiState.selectedCategory]?.projects.map(proj => (
+                                                    <option key={proj} value={proj}>{proj}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <TimerDisplay 
+                                    timerRef={timerRef} 
+                                    isRunning={timerState.isRunning} 
+                                    startTime={timerState.startTime} 
+                                />
+
+                                <div className="control-group">
+                                    {!timerState.isRunning ? (
+                                        <XPButton onClick={handleStartTimer}>
+                                            <Icons.Play /> Start
+                                        </XPButton>
+                                    ) : (
+                                        <XPButton onClick={handleStopTimer}>
+                                            <Icons.Square /> Stop
+                                        </XPButton>
+                                    )}
+                                </div>
+
+                                {timerState.isRunning && (
+                                    <div style={{ textAlign: 'center', marginTop: '20px' }}>
+                                        <p>Tracking: {timerState.category} - {timerState.project}</p>
+                                    </div>
+                                )}
+
+                                <div className="keyboard-hint">
+                                    Press SPACE to start/stop • T for Timer • P for Pomodoro
+                                </div>
+                            </div>
+                        )}
+
+                        {uiState.activeTab === 'pomodoro' && (
+                            <div>
+                                <div className="xp-group">
+                                    <span className="xp-group-title">Pomodoro Settings</span>
+                                    <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginTop: '10px' }}>
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '5px' }}>Category:</label>
+                                            <select 
+                                                className="xp-select" 
+                                                value={uiState.selectedCategory}
+                                                onChange={(e) => dispatch({ type: ActionTypes.SET_SELECTED_CATEGORY, payload: e.target.value })}
+                                                disabled={pomodoroState.isRunning}
+                                            >
+                                                {Object.keys(dataState.categories).map(cat => (
+                                                    <option key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '5px' }}>Project:</label>
+                                            <select 
+                                                className="xp-select" 
+                                                value={uiState.selectedProject}
+                                                onChange={(e) => dispatch({ type: ActionTypes.SET_SELECTED_PROJECT, payload: e.target.value })}
+                                                disabled={pomodoroState.isRunning}
+                                            >
+                                                {dataState.categories[uiState.selectedCategory]?.projects.map(proj => (
+                                                    <option key={proj} value={proj}>{proj}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <PomodoroDisplay
+                                    pomodoroRef={pomodoroRef}
+                                    isRunning={pomodoroState.isRunning}
+                                    isPaused={pomodoroState.isPaused}
+                                    onComplete={handlePomodoroComplete}
+                                />
+
+                                <div className="control-group">
+                                    {!pomodoroState.isRunning ? (
+                                        <XPButton onClick={() => dispatch({ type: ActionTypes.START_POMODORO })}>
+                                            <Icons.Play /> Start
+                                        </XPButton>
+                                    ) : (
+                                        <XPButton onClick={() => dispatch({ type: ActionTypes.PAUSE_POMODORO })}>
+                                            <Icons.Pause /> Pause
+                                        </XPButton>
+                                    )}
+                                    <XPButton onClick={() => dispatch({ type: ActionTypes.RESET_POMODORO })}>
+                                        <Icons.Square /> Reset
+                                    </XPButton>
+                                </div>
+
+                                <div className="keyboard-hint">
+                                    Press SPACE to start/pause • Audio notification on completion
+                                </div>
+                            </div>
+                        )}
+
+                        {uiState.activeTab === 'data' && (
+                            <div>
+                                <div className="xp-group">
+                                    <span className="xp-group-title">Date Filter</span>
+                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
+                                        <select 
+                                            className="xp-select" 
+                                            value={uiState.dateFilter}
+                                            onChange={(e) => dispatch({ type: ActionTypes.SET_DATE_FILTER, payload: e.target.value })}
+                                        >
+                                            <option value="daily">Daily</option>
+                                            <option value="weekly">Weekly</option>
+                                            <option value="monthly">Monthly</option>
+                                            <option value="custom">Custom Range</option>
+                                        </select>
+                                        {uiState.dateFilter === 'custom' && (
+                                            <>
+                                                <input
+                                                    type="date"
+                                                    className="xp-input"
+                                                    value={uiState.customDateRange.start}
+                                                    onChange={(e) => dispatch({ 
+                                                        type: ActionTypes.SET_CUSTOM_DATE_RANGE, 
+                                                        payload: { ...uiState.customDateRange, start: e.target.value } 
+                                                    })}
+                                                />
+                                                <span>to</span>
+                                                <input
+                                                    type="date"
+                                                    className="xp-input"
+                                                    value={uiState.customDateRange.end}
+                                                    onChange={(e) => dispatch({ 
+                                                        type: ActionTypes.SET_CUSTOM_DATE_RANGE, 
+                                                        payload: { ...uiState.customDateRange, end: e.target.value } 
+                                                    })}
+                                                />
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="xp-group">
+                                    <span className="xp-group-title">Time Distribution</span>
+                                    <div className="chart-container">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={chartData}>
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+                                                <YAxis label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
+                                                <Tooltip />
+                                                <Bar dataKey="hours" />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+
+                                <div className="xp-group">
+                                    <span className="xp-group-title">Entries ({filteredEntries.length})</span>
+                                    <div className="entry-list">
+                                        {filteredEntries.map(entry => (
+                                            <EntryRow
+                                                key={entry.id}
+                                                entry={entry}
+                                                isEditing={uiState.editingEntry === entry.id}
+                                                onEdit={handleEditEntry}
+                                                onDelete={handleDeleteEntry}
+                                                onSave={handleSaveEntry}
+                                                onCancelEdit={handleCancelEdit}
+                                                editNotes={editNotes}
+                                                setEditNotes={setEditNotes}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {uiState.activeTab === 'settings' && (
+                            <div>
+                                <div className="xp-group">
+                                    <span className="xp-group-title">Categories & Projects</span>
+                                    <div style={{ marginTop: '10px' }}>
+                                        {Object.entries(dataState.categories).map(([catName, catData]) => (
+                                            <div key={catName} style={{ marginBottom: '15px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px' }}>
+                                                    <input
+                                                        type="color"
+                                                        className="color-picker"
+                                                        value={catData.color}
+                                                        onChange={(e) => dispatch({ 
+                                                            type: ActionTypes.UPDATE_CATEGORY_COLOR, 
+                                                            payload: { category: catName, color: e.target.value } 
+                                                        })}
+                                                    />
+                                                    <strong>{catName}</strong>
+                                                </div>
+                                                <div style={{ marginLeft: '40px' }}>
+                                                    {catData.projects.map((proj, idx) => (
+                                                        <div key={idx} style={{ marginBottom: '3px' }}>
+                                                            • {proj}
+                                                        </div>
+                                                    ))}
+                                                    <XPButton 
+                                                        style={{ marginTop: '5px' }}
+                                                        onClick={() => {
+                                                            const newProject = prompt('Enter new project name:');
+                                                            if (newProject && !catData.projects.includes(newProject)) {
+                                                                dispatch({ 
+                                                                    type: ActionTypes.ADD_PROJECT, 
+                                                                    payload: { category: catName, project: newProject } 
+                                                                });
+                                                            }
+                                                        }}
+                                                    >
+                                                        Add Project
+                                                    </XPButton>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <XPButton 
+                                        style={{ marginTop: '15px' }}
+                                        onClick={() => {
+                                            const newCategory = prompt('Enter new category name:');
+                                            if (newCategory && !dataState.categories[newCategory]) {
+                                                dispatch({ 
+                                                    type: ActionTypes.ADD_CATEGORY, 
+                                                    payload: { 
+                                                        name: newCategory, 
+                                                        color: '#' + Math.floor(Math.random()*16777215).toString(16) 
+                                                    } 
+                                                });
+                                            }
+                                        }}
+                                    >
+                                        Add Category
+                                    </XPButton>
+                                </div>
+                            </div>
+                        )}
+                    </XPWindow>
+                </div>
+            );
+        };
+
+        // Render the app
+        ReactDOM.render(<XPTimeTracker />, document.getElementById('root'));
+    </script>
+</body>
+</html>
