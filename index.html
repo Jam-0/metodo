@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, useReducer } from 'react';
 import { Play, Pause, Square, Download, Upload, Trash2, Edit2, Save, X, Clock, BarChart3, Settings } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { FixedSizeList as List } from 'react-window';
 
 // Action types for reducer
 const ActionTypes = {
@@ -395,12 +394,8 @@ const XPMessageBox = ({ title, message, onOk, onCancel }) => (
   </div>
 );
 
-// Entry Row Component for Virtual List
-const EntryRow = ({ index, style, data }) => {
-  const { entries, editingEntry, onEdit, onDelete, onSave, onCancelEdit, editNotes, setEditNotes } = data;
-  const entry = entries[index];
-  const isEditing = editingEntry === entry.id;
-
+// Entry Row Component
+const EntryRow = ({ entry, isEditing, onEdit, onDelete, onSave, onCancelEdit, editNotes, setEditNotes }) => {
   const formatTime = (seconds) => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
@@ -409,7 +404,7 @@ const EntryRow = ({ index, style, data }) => {
   };
 
   return (
-    <div style={style} className="entry-item">
+    <div className="entry-item">
       <div style={{ flex: 1 }}>
         <strong>{entry.category} - {entry.project}</strong>
         <br />
@@ -922,6 +917,7 @@ const XPTimeTracker = () => {
 
         .entry-list {
           height: 300px;
+          overflow-y: auto;
           border: 2px inset #ffffff;
           background: white;
         }
@@ -1240,24 +1236,19 @@ const XPTimeTracker = () => {
             <div className="xp-group">
               <span className="xp-group-title">Entries ({filteredEntries.length})</span>
               <div className="entry-list">
-                <List
-                  height={300}
-                  itemCount={filteredEntries.length}
-                  itemSize={70}
-                  width="100%"
-                  itemData={{
-                    entries: filteredEntries,
-                    editingEntry: uiState.editingEntry,
-                    onEdit: handleEditEntry,
-                    onDelete: handleDeleteEntry,
-                    onSave: handleSaveEntry,
-                    onCancelEdit: handleCancelEdit,
-                    editNotes,
-                    setEditNotes
-                  }}
-                >
-                  {EntryRow}
-                </List>
+                {filteredEntries.map(entry => (
+                  <EntryRow
+                    key={entry.id}
+                    entry={entry}
+                    isEditing={uiState.editingEntry === entry.id}
+                    onEdit={handleEditEntry}
+                    onDelete={handleDeleteEntry}
+                    onSave={handleSaveEntry}
+                    onCancelEdit={handleCancelEdit}
+                    editNotes={editNotes}
+                    setEditNotes={setEditNotes}
+                  />
+                ))}
               </div>
             </div>
           </div>
