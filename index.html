@@ -243,7 +243,9 @@
             <button class="play-btn" onclick="playSequence()">▶ Play</button>
             <button class="stop-btn" onclick="stopSequence()">⏹ Stop</button>
             <button class="clear-btn" onclick="clearAll()">🗑 Clear All</button>
-            <button class="export-btn" onclick="exportAudio()">💾 Export Audio</button>
+            <button class="export-btn" onclick="exportComposition()">📤 Export</button>
+            <input type="file" id="import-file" accept=".txt" style="display: none;" onchange="importComposition(event)">
+            <button class="export-btn" onclick="document.getElementById('import-file').click()">📥 Import</button>
         </div>
         
         <div class="tempo-control">
@@ -263,9 +265,9 @@
         let currentStep = 0;
         let instruments = {};
         let sequences = {};
+        let trackNotes = {};
+        let trackVolumes = {};
         let stepTimeout;
-        let recorder;
-        let chunks = [];
         
         // Initialize Tone.js
         const initAudio = async () => {
@@ -353,6 +355,8 @@
                 // Initialize instrument and sequence
                 instruments[type] = instrumentTypes[type].synth().toDestination();
                 sequences[type] = new Array(16).fill(false);
+                trackNotes[type] = [];
+                trackVolumes[type] = 0.7;
             });
         };
         
@@ -400,8 +404,10 @@
         
         // Set volume for instrument
         const setVolume = (instrument, volume) => {
+            const vol = parseFloat(volume);
+            trackVolumes[instrument] = vol;
             if (instruments[instrument]) {
-                instruments[instrument].volume.value = Tone.gainToDb(parseFloat(volume));
+                instruments[instrument].volume.value = Tone.gainToDb(vol);
             }
         };
         
@@ -415,6 +421,9 @@
             const duration = durationSelect.value;
             
             if (note) {
+                // Store note data
+                trackNotes[instrument].push({ note, duration });
+                
                 const noteChip = document.createElement('span');
                 noteChip.className = 'note-chip';
                 noteChip.textContent = `${note} (${duration})`;
@@ -506,6 +515,7 @@
             
             Object.keys(sequences).forEach(instrument => {
                 sequences[instrument] = new Array(16).fill(false);
+                trackNotes[instrument] = [];
                 document.querySelectorAll(`#${instrument}-grid .step`).forEach(step => {
                     step.classList.remove('active');
                 });
@@ -513,9 +523,112 @@
             });
         };
         
-        // Export audio (placeholder)
-        const exportAudio = () => {
-            alert('Audio export feature coming soon! For now, you can record your browser audio using screen recording software.');
+        // Export composition
+        const exportComposition = () => {
+            const composition = {
+                tempo: Tone.Transport.bpm.value,
+                sequences: sequences,
+                notes: trackNotes,
+                volumes: trackVolumes,
+                timestamp: new Date().toISOString(),
+                version: "1.0"
+            };
+            
+            const dataStr = JSON.stringify(composition, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'text/plain' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `composition_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+            link.click();
+            
+            alert('Composition exported! Save this .txt file and use Import to load it later.');
+        };
+        
+        // Import composition
+        const importComposition = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const composition = JSON.parse(e.target.result);
+                    
+                    // Clear current composition
+                    clearAll();
+                    
+                    // Load tempo
+                    if (composition.tempo) {
+                        Tone.Transport.bpm.value = composition.tempo;
+                        document.getElementById('tempo').value = composition.tempo;
+                        document.getElementById('tempo-value').textContent = composition.tempo;
+                    }
+                    
+                    // Load sequences
+                    if (composition.sequences) {
+                        Object.keys(composition.sequences).forEach(instrument => {
+                            if (sequences[instrument]) {
+                                sequences[instrument] = composition.sequences[instrument];
+                                composition.sequences[instrument].forEach((active, index) => {
+                                    const stepElement = document.querySelectorAll(`#${instrument}-grid .step`)[index];
+                                    if (stepElement) {
+                                        stepElement.classList.toggle('active', active);
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    
+                    // Load notes
+                    if (composition.notes) {
+                        Object.keys(composition.notes).forEach(instrument => {
+                            if (trackNotes[instrument]) {
+                                trackNotes[instrument] = composition.notes[instrument];
+                                const notesDisplay = document.getElementById(`${instrument}-notes`);
+                                composition.notes[instrument].forEach(noteData => {
+                                    const noteChip = document.createElement('span');
+                                    noteChip.className = 'note-chip';
+                                    noteChip.textContent = `${noteData.note} (${noteData.duration})`;
+                                    noteChip.onclick = () => {
+                                        initAudio().then(() => {
+                                            if (instrument === 'drums') {
+                                                instruments[instrument].triggerAttackRelease('C2', noteData.duration);
+                                            } else {
+                                                instruments[instrument].triggerAttackRelease(noteData.note, noteData.duration);
+                                            }
+                                        });
+                                    };
+                                    notesDisplay.appendChild(noteChip);
+                                });
+                            }
+                        });
+                    }
+                    
+                    // Load volumes
+                    if (composition.volumes) {
+                        Object.keys(composition.volumes).forEach(instrument => {
+                            if (trackVolumes[instrument] !== undefined) {
+                                const volume = composition.volumes[instrument];
+                                trackVolumes[instrument] = volume;
+                                const volumeSlider = document.querySelector(`#tracks input[onchange*="${instrument}"]`);
+                                if (volumeSlider) {
+                                    volumeSlider.value = volume;
+                                    setVolume(instrument, volume);
+                                }
+                            }
+                        });
+                    }
+                    
+                    alert('Composition loaded successfully!');
+                } catch (error) {
+                    alert('Error loading composition: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+            
+            // Reset file input
+            event.target.value = '';
         };
         
         // Initialize everything when page loads
