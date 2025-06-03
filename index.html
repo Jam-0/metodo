@@ -268,84 +268,189 @@
         let trackNotes = {};
         let trackVolumes = {};
         let stepTimeout;
+        let reverb, compressor;
         
-        // Initialize Tone.js
+        // Initialize Tone.js and effects
         const initAudio = async () => {
             if (Tone.context.state !== 'running') {
                 await Tone.start();
             }
+            
+            // Create global effects if not already created
+            if (!reverb) {
+                reverb = new Tone.Reverb({
+                    decay: 2.0,
+                    wet: 0.3
+                }).toDestination();
+                
+                compressor = new Tone.Compressor({
+                    threshold: -24,
+                    ratio: 12,
+                    attack: 0.003,
+                    release: 0.25
+                }).connect(reverb);
+            }
         };
         
-        // Instrument definitions
+        // Advanced instrument definitions
         const instrumentTypes = {
             piano: {
                 name: "🎹 Piano",
-                synth: () => new Tone.Synth({
-                    oscillator: { type: "triangle" },
-                    envelope: { attack: 0.02, decay: 0.1, sustain: 0.3, release: 1 }
-                })
+                synth: () => {
+                    // FM synthesis to simulate piano hammer strikes
+                    const piano = new Tone.FMSynth({
+                        harmonicity: 2.1,
+                        modulationIndex: 12,
+                        oscillator: { type: "sine" },
+                        envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 1.2 },
+                        modulation: { type: "square" },
+                        modulationEnvelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 }
+                    });
+                    
+                    // Add subtle chorus effect
+                    const chorus = new Tone.Chorus(0.6, 2.5, 0.5).connect(compressor);
+                    piano.connect(chorus);
+                    return piano;
+                }
             },
             guitar: {
                 name: "🎸 Guitar", 
-                synth: () => new Tone.PluckSynth({
-                    attackNoise: 1,
-                    dampening: 4000,
-                    resonance: 0.7
-                })
+                synth: () => {
+                    // Enhanced pluck synthesis with realistic guitar properties
+                    const guitar = new Tone.PluckSynth({
+                        attackNoise: 2,
+                        dampening: 2000,
+                        resonance: 0.9
+                    });
+                    
+                    // Add slight distortion and reverb for guitar character
+                    const filter = new Tone.Filter(3000, "lowpass").connect(compressor);
+                    const distortion = new Tone.Distortion(0.1).connect(filter);
+                    guitar.connect(distortion);
+                    return guitar;
+                }
             },
             bass: {
                 name: "🎸 Bass",
-                synth: () => new Tone.Synth({
-                    oscillator: { type: "sawtooth" },
-                    filter: { frequency: 200 },
-                    envelope: { attack: 0.02, decay: 0.1, sustain: 0.5, release: 0.8 }
-                })
+                synth: () => {
+                    // FM synthesis optimized for bass frequencies
+                    const bass = new Tone.FMSynth({
+                        harmonicity: 1,
+                        modulationIndex: 10,
+                        oscillator: { type: "sawtooth" },
+                        envelope: { attack: 0.01, decay: 0.3, sustain: 0.4, release: 1.5 },
+                        modulation: { type: "square" },
+                        modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.1 }
+                    });
+                    
+                    // Bass-focused filtering
+                    const lowpass = new Tone.Filter(800, "lowpass").connect(compressor);
+                    bass.connect(lowpass);
+                    return bass;
+                }
             },
             drums: {
                 name: "🥁 Drums",
-                synth: () => new Tone.MembraneSynth({
-                    pitchDecay: 0.05,
-                    octaves: 10,
-                    oscillator: { type: "sine" },
-                    envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4 }
-                })
+                synth: () => {
+                    // Multiple drum sounds using different synthesis
+                    const drums = new Tone.PolySynth();
+                    
+                    // Custom drum synth that can play different drum sounds
+                    drums.set({
+                        oscillator: { type: "triangle" },
+                        envelope: { attack: 0.001, decay: 0.1, sustain: 0.01, release: 0.3 }
+                    });
+                    
+                    const filter = new Tone.Filter(400, "lowpass").connect(compressor);
+                    drums.connect(filter);
+                    return drums;
+                }
             },
             violin: {
                 name: "🎻 Violin",
-                synth: () => new Tone.Synth({
-                    oscillator: { type: "sawtooth" },
-                    filter: { frequency: 1000 },
-                    envelope: { attack: 0.3, decay: 0.1, sustain: 0.8, release: 1 }
-                })
+                synth: () => {
+                    // AM synthesis to simulate bowing with vibrato
+                    const violin = new Tone.AMSynth({
+                        harmonicity: 3.01,
+                        oscillator: { type: "sawtooth" },
+                        envelope: { attack: 0.4, decay: 0.01, sustain: 1.0, release: 1.2 },
+                        modulation: { type: "square" },
+                        modulationEnvelope: { attack: 0.5, decay: 0.01, sustain: 1.0, release: 1.2 }
+                    });
+                    
+                    // Add vibrato LFO
+                    const vibrato = new Tone.Vibrato(5, 0.02).connect(compressor);
+                    violin.connect(vibrato);
+                    return violin;
+                }
             },
             harp: {
                 name: "🪕 Harp",
-                synth: () => new Tone.PluckSynth({
-                    attackNoise: 0.2,
-                    dampening: 2000,
-                    resonance: 0.9
-                })
+                synth: () => {
+                    // Enhanced pluck with longer sustain and higher resonance
+                    const harp = new Tone.PluckSynth({
+                        attackNoise: 0.1,
+                        dampening: 1000,
+                        resonance: 0.95
+                    });
+                    
+                    // Bright, crystalline filtering
+                    const highpass = new Tone.Filter(200, "highpass").connect(compressor);
+                    harp.connect(highpass);
+                    return harp;
+                }
             },
             saxophone: {
                 name: "🎷 Saxophone",
-                synth: () => new Tone.Synth({
-                    oscillator: { type: "triangle" },
-                    filter: { frequency: 800 },
-                    envelope: { attack: 0.1, decay: 0.1, sustain: 0.7, release: 1 }
-                })
+                synth: () => {
+                    // FM synthesis to simulate reed instrument
+                    const sax = new Tone.FMSynth({
+                        harmonicity: 3.5,
+                        modulationIndex: 20,
+                        oscillator: { type: "sawtooth" },
+                        envelope: { attack: 0.1, decay: 0.2, sustain: 0.7, release: 1.0 },
+                        modulation: { type: "sine" },
+                        modulationEnvelope: { attack: 0.1, decay: 0.1, sustain: 0.6, release: 0.8 }
+                    });
+                    
+                    // Bandpass filter for sax character
+                    const bandpass = new Tone.Filter({
+                        frequency: 1000,
+                        type: "bandpass",
+                        Q: 2
+                    }).connect(compressor);
+                    sax.connect(bandpass);
+                    return sax;
+                }
             },
             vocal: {
                 name: "🎤 Vocal",
-                synth: () => new Tone.Synth({
-                    oscillator: { type: "sine" },
-                    filter: { frequency: 1200 },
-                    envelope: { attack: 0.05, decay: 0.1, sustain: 0.6, release: 0.8 }
-                })
+                synth: () => {
+                    // Multiple oscillators to simulate vocal formants
+                    const vocal = new Tone.AMSynth({
+                        harmonicity: 2,
+                        oscillator: { type: "sine" },
+                        envelope: { attack: 0.05, decay: 0.1, sustain: 0.8, release: 1.0 },
+                        modulation: { type: "triangle" },
+                        modulationEnvelope: { attack: 0.05, decay: 0.1, sustain: 0.3, release: 0.8 }
+                    });
+                    
+                    // Formant filtering for vocal character
+                    const formant = new Tone.Filter({
+                        frequency: 1200,
+                        type: "bandpass",
+                        Q: 10
+                    }).connect(compressor);
+                    vocal.connect(formant);
+                    return vocal;
+                }
             }
         };
         
         // Initialize tracks
-        const initTracks = () => {
+        const initTracks = async () => {
+            await initAudio(); // Make sure effects are created first
+            
             const tracksContainer = document.getElementById('tracks');
             
             Object.keys(instrumentTypes).forEach(type => {
@@ -353,7 +458,7 @@
                 tracksContainer.appendChild(track);
                 
                 // Initialize instrument and sequence
-                instruments[type] = instrumentTypes[type].synth().toDestination();
+                instruments[type] = instrumentTypes[type].synth();
                 sequences[type] = new Array(16).fill(false);
                 trackNotes[type] = [];
                 trackVolumes[type] = 0.7;
@@ -431,7 +536,17 @@
                     // Play note when clicked
                     initAudio().then(() => {
                         if (instrument === 'drums') {
-                            instruments[instrument].triggerAttackRelease('C2', duration);
+                            // Play different drum sounds based on note
+                            const drumNote = note.toUpperCase();
+                            if (drumNote.includes('KICK') || drumNote.includes('K')) {
+                                instruments[instrument].triggerAttackRelease('C1', duration);
+                            } else if (drumNote.includes('SNARE') || drumNote.includes('S')) {
+                                instruments[instrument].triggerAttackRelease('C3', duration);
+                            } else if (drumNote.includes('HAT') || drumNote.includes('H')) {
+                                instruments[instrument].triggerAttackRelease('C5', duration);
+                            } else {
+                                instruments[instrument].triggerAttackRelease('C2', duration);
+                            }
                         } else {
                             instruments[instrument].triggerAttackRelease(note, duration);
                         }
