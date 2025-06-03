@@ -730,7 +730,465 @@
             stepElement.classList.toggle('active', sequences[instrument][step]);
         };
         
+        // Set volume for instrument
+        const setVolume = (instrument, volume) => {
+            const vol = parseFloat(volume);
+            trackVolumes[instrument] = vol;
+            if (instruments[instrument]) {
+                instruments[instrument].volume.value = Tone.gainToDb(vol);
+            }
+        };
+        
+        // Add note to track
+        const addNote = (instrument) => {
+            const noteInput = document.getElementById(`${instrument}-note`);
+            const durationSelect = document.getElementById(`${instrument}-duration`);
+            const notesDisplay = document.getElementById(`${instrument}-notes`);
+            
+            const note = noteInput.value.trim();
+            const duration = durationSelect.value;
+            
+            if (note) {
+                // Store note data
+                trackNotes[instrument].push({ note, duration });
+                
+                const noteChip = document.createElement('span');
+                noteChip.className = 'note-chip';
+                noteChip.textContent = `${note} (${duration})`;
+                noteChip.onclick = () => {
+                    // Play note when clicked
+                    initAudio().then(() => {
+                        if (instrument === 'drums') {
+                            // Play different drum sounds based on note
+                            const drumNote = note.toUpperCase();
+                            if (drumNote.includes('KICK') || drumNote.includes('K')) {
+                                instruments[instrument].triggerAttackRelease('C1', duration);
+                            } else if (drumNote.includes('SNARE') || drumNote.includes('S')) {
+                                instruments[instrument].triggerAttackRelease('C3', duration);
+                            } else if (drumNote.includes('HAT') || drumNote.includes('H')) {
+                                instruments[instrument].triggerAttackRelease('C5', duration);
+                            } else {
+                                instruments[instrument].triggerAttackRelease('C2', duration);
+                            }
+                        } else {
+                            instruments[instrument].triggerAttackRelease(note, duration);
+                        }
+                    });
+                };
+                notesDisplay.appendChild(noteChip);
+                noteInput.value = '';
+            }
+        };
+        
+        // Update tempo
+        const updateTempo = (value) => {
+            Tone.Transport.bpm.value = parseInt(value);
+            document.getElementById('tempo-value').textContent = value;
+        };
+        
+        // Play sequence
+        const playSequence = async () => {
+            await initAudio();
+            
+            if (isPlaying) return;
+            isPlaying = true;
+            currentStep = 0;
+            
+            const stepDuration = 60 / (Tone.Transport.bpm.value * 4); // 16th notes
+            
+            const playStep = () => {
+                if (!isPlaying) return;
+                
+                // Clear previous playing indicators
+                document.querySelectorAll('.step.playing').forEach(el => {
+                    el.classList.remove('playing');
+                });
+                
+                // Highlight current step
+                Object.keys(sequences).forEach(instrument => {
+                    const stepElement = document.querySelectorAll(`#${instrument}-grid .step`)[currentStep];
+                    stepElement.classList.add('playing');
+                    
+                    // Play note if step is active
+                    if (sequences[instrument][currentStep]) {
+                        if (instrument === 'drums') {
+                            // Cycle through different drum sounds for sequencer
+                            const drumSounds = ['C1', 'C3', 'C5', 'C2'];
+                            const drumNote = drumSounds[currentStep % 4];
+                            instruments[instrument].triggerAttackRelease(drumNote, '16n');
+                        } else {
+                            // Use a default note for sequencer playback
+                            const defaultNotes = {
+                                piano: 'C4',
+                                guitar: 'E3',
+                                bass: 'C2',
+                                violin: 'G4',
+                                harp: 'C5',
+                                saxophone: 'F4',
+                                vocal: 'A4'
+                            };
+                            instruments[instrument].triggerAttackRelease(defaultNotes[instrument] || 'C4', '16n');
+                        }
+                    }
+                });
+                
+                currentStep = (currentStep + 1) % 32;
+                stepTimeout = setTimeout(playStep, stepDuration * 1000);
+            };
+            
+            playStep();
+        };
+        
+        // Stop sequence
+        const stopSequence = () => {
+            isPlaying = false;
+            clearTimeout(stepTimeout);
+            
+            // Clear playing indicators
+            document.querySelectorAll('.step.playing').forEach(el => {
+                el.classList.remove('playing');
+            });
+        };
+        
         // Musical Intelligence Functions
+        
+        // Load chord progression
+        const loadProgression = (type) => {
+            const progression = chordProgressions[type];
+            if (!progression) return;
+            
+            currentProgression = progression.chords;
+            currentKey = progression.key;
+            
+            // Update display
+            const display = document.getElementById('chord-display');
+            display.innerHTML = progression.chords.map(chord => 
+                `<span class="chord-chip" onclick="playChord('${chord}')">${chord}</span>`
+            ).join('');
+            
+            // Update key selector
+            document.getElementById('key-select').value = progression.key;
+            updateScaleNotes();
+        };
+        
+        // Play chord
+        const playChord = async (chord) => {
+            await initAudio();
+            const notes = chordNotes[chord];
+            if (notes && instruments.piano) {
+                notes.forEach((note, index) => {
+                    setTimeout(() => {
+                        instruments.piano.triggerAttackRelease(note + '4', '2n');
+                    }, index * 50);
+                });
+            }
+        };
+        
+        // Generate bass line from chord progression
+        const generateBassLine = () => {
+            if (currentProgression.length === 0) {
+                alert('Load a chord progression first!');
+                return;
+            }
+            
+            // Clear existing bass notes
+            trackNotes.bass = [];
+            document.getElementById('bass-notes').innerHTML = '';
+            
+            // Generate bass line
+            currentProgression.forEach((chord, index) => {
+                const rootNote = chordNotes[chord] ? chordNotes[chord][0] + '2' : 'C2';
+                const noteData = { note: rootNote, duration: '2n' };
+                trackNotes.bass.push(noteData);
+                
+                // Add to display
+                const noteChip = document.createElement('span');
+                noteChip.className = 'note-chip';
+                noteChip.textContent = `${rootNote} (2n)`;
+                noteChip.onclick = () => {
+                    initAudio().then(() => {
+                        instruments.bass.triggerAttackRelease(rootNote, '2n');
+                    });
+                };
+                document.getElementById('bass-notes').appendChild(noteChip);
+            });
+            
+            alert(`Generated ${currentProgression.length} bass notes!`);
+        };
+        
+        // Generate arpeggio pattern
+        const generateArpeggio = () => {
+            if (currentProgression.length === 0) {
+                alert('Load a chord progression first!');
+                return;
+            }
+            
+            // Clear existing harp notes
+            trackNotes.harp = [];
+            document.getElementById('harp-notes').innerHTML = '';
+            
+            // Generate arpeggios
+            currentProgression.forEach(chord => {
+                const notes = chordNotes[chord];
+                if (notes) {
+                    notes.forEach(note => {
+                        const noteData = { note: note + '4', duration: '8n' };
+                        trackNotes.harp.push(noteData);
+                        
+                        // Add to display
+                        const noteChip = document.createElement('span');
+                        noteChip.className = 'note-chip';
+                        noteChip.textContent = `${note}4 (8n)`;
+                        noteChip.onclick = () => {
+                            initAudio().then(() => {
+                                instruments.harp.triggerAttackRelease(note + '4', '8n');
+                            });
+                        };
+                        document.getElementById('harp-notes').appendChild(noteChip);
+                    });
+                }
+            });
+            
+            alert(`Generated arpeggio pattern!`);
+        };
+        
+        // Harmonize melody (add harmony to piano notes)
+        const harmonizeMelody = () => {
+            if (trackNotes.piano.length === 0) {
+                alert('Add some piano notes first!');
+                return;
+            }
+            
+            if (currentProgression.length === 0) {
+                alert('Load a chord progression first!');
+                return;
+            }
+            
+            // Clear existing violin notes
+            trackNotes.violin = [];
+            document.getElementById('violin-notes').innerHTML = '';
+            
+            // Generate harmony notes (thirds above)
+            trackNotes.piano.forEach(pianoNote => {
+                const noteName = pianoNote.note.replace(/\d+/, '');
+                const octave = pianoNote.note.replace(/[^0-9]/g, '');
+                
+                // Find harmony note (third above)
+                const scaleArray = scaleNotes[currentKey] || scaleNotes['D'];
+                const noteIndex = scaleArray.findIndex(n => n === noteName);
+                if (noteIndex !== -1) {
+                    const harmonyNote = scaleArray[(noteIndex + 2) % scaleArray.length];
+                    const harmonyNoteData = { 
+                        note: harmonyNote + octave, 
+                        duration: pianoNote.duration 
+                    };
+                    trackNotes.violin.push(harmonyNoteData);
+                    
+                    // Add to display
+                    const noteChip = document.createElement('span');
+                    noteChip.className = 'note-chip';
+                    noteChip.textContent = `${harmonyNote}${octave} (${pianoNote.duration})`;
+                    noteChip.onclick = () => {
+                        initAudio().then(() => {
+                            instruments.violin.triggerAttackRelease(harmonyNote + octave, pianoNote.duration);
+                        });
+                    };
+                    document.getElementById('violin-notes').appendChild(noteChip);
+                }
+            });
+            
+            alert('Generated harmony for piano melody!');
+        };
+        
+        // Update scale notes display
+        const updateScaleNotes = () => {
+            const key = document.getElementById('key-select').value;
+            currentKey = key;
+            const notes = scaleNotes[key] || scaleNotes['D'];
+            document.getElementById('scale-notes').textContent = notes.join(' ');
+        };
+        
+        // Clear all sequences
+        const clearAll = () => {
+            stopSequence();
+            
+            Object.keys(sequences).forEach(instrument => {
+                sequences[instrument] = new Array(32).fill(false);
+                trackNotes[instrument] = [];
+                document.querySelectorAll(`#${instrument}-grid .step`).forEach(step => {
+                    step.classList.remove('active');
+                });
+                document.getElementById(`${instrument}-notes`).innerHTML = '';
+            });
+            
+            // Clear chord progression display
+            currentProgression = [];
+            document.getElementById('chord-display').innerHTML = '<span class="info-text">Select a progression above or build your own</span>';
+        };
+        
+        // Export composition
+        const exportComposition = () => {
+            const composition = {
+                tempo: Tone.Transport.bpm.value,
+                sequences: sequences,
+                notes: trackNotes,
+                volumes: trackVolumes,
+                progression: currentProgression,
+                key: currentKey,
+                timestamp: new Date().toISOString(),
+                version: "2.0"
+            };
+            
+            const dataStr = JSON.stringify(composition, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'text/plain' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `composition_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+            link.click();
+            
+            alert('Composition exported! Save this .txt file and use Import to load it later.');
+        };
+        
+        // Import composition
+        const importComposition = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const composition = JSON.parse(e.target.result);
+                    
+                    // Clear current composition
+                    clearAll();
+                    
+                    // Load tempo
+                    if (composition.tempo) {
+                        Tone.Transport.bpm.value = composition.tempo;
+                        document.getElementById('tempo').value = composition.tempo;
+                        document.getElementById('tempo-value').textContent = composition.tempo;
+                    }
+                    
+                    // Load chord progression
+                    if (composition.progression && composition.key) {
+                        currentProgression = composition.progression;
+                        currentKey = composition.key;
+                        
+                        const display = document.getElementById('chord-display');
+                        display.innerHTML = composition.progression.map(chord => 
+                            `<span class="chord-chip" onclick="playChord('${chord}')">${chord}</span>`
+                        ).join('');
+                        
+                        document.getElementById('key-select').value = composition.key;
+                        updateScaleNotes();
+                    }
+                    
+                    // Load sequences
+                    if (composition.sequences) {
+                        Object.keys(composition.sequences).forEach(instrument => {
+                            if (sequences[instrument]) {
+                                sequences[instrument] = composition.sequences[instrument];
+                                composition.sequences[instrument].forEach((active, index) => {
+                                    const stepElement = document.querySelectorAll(`#${instrument}-grid .step`)[index];
+                                    if (stepElement) {
+                                        stepElement.classList.toggle('active', active);
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    
+                    // Load notes
+                    if (composition.notes) {
+                        Object.keys(composition.notes).forEach(instrument => {
+                            if (trackNotes[instrument]) {
+                                trackNotes[instrument] = composition.notes[instrument];
+                                const notesDisplay = document.getElementById(`${instrument}-notes`);
+                                composition.notes[instrument].forEach(noteData => {
+                                    const noteChip = document.createElement('span');
+                                    noteChip.className = 'note-chip';
+                                    noteChip.textContent = `${noteData.note} (${noteData.duration})`;
+                                    noteChip.onclick = () => {
+                                        initAudio().then(() => {
+                                            if (instrument === 'drums') {
+                                                const drumNote = noteData.note.toUpperCase();
+                                                if (drumNote.includes('KICK') || drumNote.includes('K')) {
+                                                    instruments[instrument].triggerAttackRelease('C1', noteData.duration);
+                                                } else if (drumNote.includes('SNARE') || drumNote.includes('S')) {
+                                                    instruments[instrument].triggerAttackRelease('C3', noteData.duration);
+                                                } else if (drumNote.includes('HAT') || drumNote.includes('H')) {
+                                                    instruments[instrument].triggerAttackRelease('C5', noteData.duration);
+                                                } else {
+                                                    instruments[instrument].triggerAttackRelease('C2', noteData.duration);
+                                                }
+                                            } else {
+                                                instruments[instrument].triggerAttackRelease(noteData.note, noteData.duration);
+                                            }
+                                        });
+                                    };
+                                    notesDisplay.appendChild(noteChip);
+                                });
+                            }
+                        });
+                    }
+                    
+                    // Load volumes
+                    if (composition.volumes) {
+                        Object.keys(composition.volumes).forEach(instrument => {
+                            if (trackVolumes[instrument] !== undefined) {
+                                const volume = composition.volumes[instrument];
+                                trackVolumes[instrument] = volume;
+                                const volumeSlider = document.querySelector(`#tracks input[onchange*="${instrument}"]`);
+                                if (volumeSlider) {
+                                    volumeSlider.value = volume;
+                                    setVolume(instrument, volume);
+                                }
+                            }
+                        });
+                    }
+                    
+                    alert('Composition loaded successfully!');
+                } catch (error) {
+                    alert('Error loading composition: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+            
+        // Initialize everything when page loads
+        window.addEventListener('load', async () => {
+            await initTracks();
+            
+            // Load Canon in D as demo
+            loadProgression('canon');
+            
+            // Add some demo melody notes for Canon
+            const canonMelody = [
+                { note: 'D5', duration: '2n' },
+                { note: 'A4', duration: '4n' },
+                { note: 'B4', duration: '4n' },
+                { note: 'F#4', duration: '2n' },
+                { note: 'G4', duration: '4n' },
+                { note: 'D4', duration: '4n' },
+                { note: 'G4', duration: '2n' },
+                { note: 'A4', duration: '1n' }
+            ];
+            
+            // Add Canon melody to piano
+            trackNotes.piano = canonMelody;
+            const pianoNotesDisplay = document.getElementById('piano-notes');
+            canonMelody.forEach(noteData => {
+                const noteChip = document.createElement('span');
+                noteChip.className = 'note-chip';
+                noteChip.textContent = `${noteData.note} (${noteData.duration})`;
+                noteChip.onclick = () => {
+                    initAudio().then(() => {
+                        instruments.piano.triggerAttackRelease(noteData.note, noteData.duration);
+                    });
+                };
+                pianoNotesDisplay.appendChild(noteChip);
+            });
+        });
         
         // Load chord progression
         const loadProgression = (type) => {
